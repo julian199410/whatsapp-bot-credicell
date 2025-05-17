@@ -156,13 +156,13 @@ cython_debug/
 
 # .json files
 # *.json
-conf/credentials.json
+config/credentials.json
 
 # folder
 versiones/
 
 # Ignore all fields  .docx
-.docx
+*.docx
 
 # PyCharm
 #  JetBrains specific template is maintained in a separate JetBrains.gitignore that can
