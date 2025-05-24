@@ -180,7 +180,7 @@ def parse_user_message(message: str) -> tuple:
     pattern = re.compile(
         r"(?:precios?|precio|info|informaci[oó]n|consulta)\s*(?:por|de|para)?\s*"
         r"(krediya|kredi|credia|crediya|adelantos|adelanto|sumas\s*pay|sumaspay|sumas|addi|"
-        r"banco\s*de\s*bogota|bancobogota|bogota|brilla|recompra|re\s*compra)\s*"
+        r"banco\s*de\s*bogota|bancobogota|bogota|brilla|recompra|re\s*compra|contado)\s*"
         r"(?:de|del|para|sobre)?\s*(.+)",
         re.IGNORECASE,
     )
@@ -201,6 +201,7 @@ def parse_user_message(message: str) -> tuple:
             "bancobogota": "banco de bogota",
             "bogota": "banco de bogota",
             "re compra": "recompra",
+            "contado": "contado",
         }
 
         financiera = financiera_map.get(financiera, financiera)
