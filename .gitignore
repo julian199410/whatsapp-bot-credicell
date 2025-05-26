@@ -164,6 +164,12 @@ versiones/
 # Ignore all fields  .docx
 *.docx
 
+# Ignore all fields  .iml
+*.iml
+
+# Ignore all fields  .xml
+*.xml
+
 # Ignore all fields  .txt
 /CONDICIONES DE PRECIOS PARA MENSAJES.txt
 
