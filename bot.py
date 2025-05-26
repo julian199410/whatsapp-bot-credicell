@@ -89,7 +89,8 @@ def bot():
         if data:
             try:
                 precio_base = clean_currency(data.get("PRECIO BASE", 0))
-                precio_contado = precio_base + 180000
+                VALOR_EXTRA = 180000
+                precio_contado = precio_base + VALOR_EXTRA
                 response = (
                     f"📱 {data.get('CELULAR', 'N/A')}\n\n"
                     f"💰 PRECIO DE CONTADO 💰\n\n"
@@ -109,14 +110,24 @@ def bot():
             if financiera in ["krediya", "adelantos"]:
                 response = procesar_krediya(data, financiera)
             else:
-                response = (
-                    f"📱 {data.get('CELULAR', 'N/A')}\n\n"
-                    f"📊 Información para {financiera.upper()} 📊\n\n"
-                    # f"Precio Base: {format_currency(data.get('PRECIO BASE', 'N/A'))}\n"
-                    # f"Addi/Sumas: {format_currency(data.get('PRECIO ADDI Y SUMAS', 'N/A'))}\n"
-                    # f"➖➖➖➖➖➖➖➖➖\n"
-                    f"💰 Total: {format_currency(data.get('PRECIO ADDI Y SUMAS', 'N/A'))}"
-                )
+                try:
+                    # Para Sumas Pay, Addi, Banco de Bogotá, Brilla
+                    precio_base = clean_currency(data.get("PRECIO BASE", 0))
+                    precio_addi_sumas = clean_currency(data.get("PRECIO ADDI Y SUMAS", 0))
+                    # sumar la columna de "PRECIO BASE + PRECIO ADDI Y SUMAS" de la hoja de cálculo
+                    total = precio_base + precio_addi_sumas
+
+                    response = (
+                        f"📱 {data.get('CELULAR', 'N/A')}\n\n"
+                        f"📊 Información para {financiera.upper()} 📊\n\n"
+                        # f"Precio Base: {format_currency(data.get('PRECIO BASE', 'N/A'))}\n"
+                        # f"Addi/Sumas: {format_currency(data.get('PRECIO ADDI Y SUMAS', 'N/A'))}\n"
+                        # f"➖➖➖➖➖➖➖➖➖\n"
+                        f"💰 Total: {format_currency(total)}"
+                    )
+                except Exception as e:
+                    logger.error(f"Error calculando precio para {financiera}: {e}")
+                    response = f"Error calculando el precio para {financiera}"
         else:
             response = f"No se encontró información para el modelo: {modelo_celular}"
 
