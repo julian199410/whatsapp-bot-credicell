@@ -9,6 +9,7 @@ from utils.utils_methods import (
     format_currency,
     procesar_krediya,
     parse_user_message,
+    clean_currency,
 )
 
 
@@ -83,20 +84,50 @@ def bot():
             response = (
                 f"No se encontró información para recompra del modelo: {modelo_celular}"
             )
+    elif financiera == "contado":
+        data = buscar_celular(spreadsheet, VALORES_WORKSHEET, modelo_celular)
+        if data:
+            try:
+                precio_base = clean_currency(data.get("PRECIO BASE", 0))
+                VALOR_EXTRA = 180000
+                precio_contado = precio_base + VALOR_EXTRA
+                response = (
+                    f"📱 {data.get('CELULAR', 'N/A')}\n\n"
+                    f"💰 PRECIO DE CONTADO 💰\n\n"
+                    # f"Precio Base: {format_currency(precio_base)}\n"
+                    # f"Valor Adicional: $180.000\n"
+                    # f"➖➖➖➖➖➖➖➖➖\n"
+                    f"💵 Total Contado: {format_currency(precio_contado)}"
+                )
+            except Exception as e:
+                logger.error(f"Error calculando precio contado: {e}")
+                response = f"Error calculando el precio de contado para {modelo_celular}"
+        else:
+            response = f"No se encontró información para el modelo: {modelo_celular}"
     else:
         data = buscar_celular(spreadsheet, VALORES_WORKSHEET, modelo_celular)
         if data:
             if financiera in ["krediya", "adelantos"]:
                 response = procesar_krediya(data, financiera)
             else:
-                response = (
-                    f"📱 {data.get('CELULAR', 'N/A')}\n\n"
-                    f"📊 Información para {financiera.upper()} 📊\n\n"
-                    f"Precio Base: {format_currency(data.get('PRECIO BASE', 'N/A'))}\n"
-                    f"Addi/Sumas: {format_currency(data.get('PRECIO ADDI Y SUMAS', 'N/A'))}\n"
-                    f"➖➖➖➖➖➖➖➖➖\n"
-                    f"💰 Total: {format_currency(data.get('PRECIO ADDI Y SUMAS', 'N/A'))}"
-                )
+                try:
+                    # Para Sumas Pay, Addi, Banco de Bogotá, Brilla
+                    precio_base = clean_currency(data.get("PRECIO BASE", 0))
+                    precio_addi_sumas = clean_currency(data.get("PRECIO ADDI Y SUMAS", 0))
+                    # sumar la columna de "PRECIO BASE + PRECIO ADDI Y SUMAS" de la hoja de cálculo
+                    total = precio_base + precio_addi_sumas
+
+                    response = (
+                        f"📱 {data.get('CELULAR', 'N/A')}\n\n"
+                        f"📊 Información para {financiera.upper()} 📊\n\n"
+                        # f"Precio Base: {format_currency(data.get('PRECIO BASE', 'N/A'))}\n"
+                        # f"Addi/Sumas: {format_currency(data.get('PRECIO ADDI Y SUMAS', 'N/A'))}\n"
+                        # f"➖➖➖➖➖➖➖➖➖\n"
+                        f"💰 Total: {format_currency(total)}"
+                    )
+                except Exception as e:
+                    logger.error(f"Error calculando precio para {financiera}: {e}")
+                    response = f"Error calculando el precio para {financiera}"
         else:
             response = f"No se encontró información para el modelo: {modelo_celular}"
 

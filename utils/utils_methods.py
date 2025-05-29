@@ -24,10 +24,13 @@ def init_google_sheets():
             GOOGLE_SHEETS_CREDENTIALS, SCOPES
         )
         client = gspread.authorize(creds)
+        # logger.info("Autenticación con Google Sheets exitosa")
+        
         spreadsheet = client.open(SPREADSHEET_NAME)
+        # logger.info(f"Hoja de cálculo '{SPREADSHEET_NAME}' encontrada")
         return spreadsheet
     except Exception as e:
-        logger.error(f"Error al inicializar Google Sheets: {e}")
+        logger.error(f"Error detallado al inicializar Google Sheets: {str(e)}", exc_info=True)
         return None
 
 
@@ -47,7 +50,7 @@ def buscar_celular(spreadsheet, worksheet_name: str, busqueda: str) -> Optional[
                 "PRECIO BASE",
                 "PRECIO ADDI Y SUMAS",
                 "CONTADO",
-                "GANACIA",
+                # "GANACIA",
             ]
         else:
             expected_headers = [
@@ -59,16 +62,17 @@ def buscar_celular(spreadsheet, worksheet_name: str, busqueda: str) -> Optional[
                 "DESCUENTO",
                 "PRECIO BASE",
                 "PRECIO ADDI Y SUMAS",
-                "GANACIA",
+                # "GANACIA",
             ]
 
         # Obtener todos los valores (incluyendo fórmulas calculadas)
         cell_list = worksheet.get_all_values()
         actual_headers = cell_list[0]
+        logger.info(f"Headers encontrados en {worksheet_name}: {actual_headers}")
 
         # Verificar que los headers coincidan
         if not all(header in actual_headers for header in expected_headers):
-            logger.error(f"Los headers en la hoja no coinciden con los esperados")
+            # logger.error("Los headers en la hoja no coinciden con los esperados")
             return None
 
         # Procesar registros manteniendo los valores calculados
@@ -180,7 +184,7 @@ def parse_user_message(message: str) -> tuple:
     pattern = re.compile(
         r"(?:precios?|precio|info|informaci[oó]n|consulta)\s*(?:por|de|para)?\s*"
         r"(krediya|kredi|credia|crediya|adelantos|adelanto|sumas\s*pay|sumaspay|sumas|addi|"
-        r"banco\s*de\s*bogota|bancobogota|bogota|brilla|recompra|re\s*compra)\s*"
+        r"banco\s*de\s*bogota|bancobogota|bogota|brilla|recompra|re\s*compra|contado)\s*"
         r"(?:de|del|para|sobre)?\s*(.+)",
         re.IGNORECASE,
     )
@@ -201,6 +205,7 @@ def parse_user_message(message: str) -> tuple:
             "bancobogota": "banco de bogota",
             "bogota": "banco de bogota",
             "re compra": "recompra",
+            "contado": "contado",
         }
 
         financiera = financiera_map.get(financiera, financiera)
