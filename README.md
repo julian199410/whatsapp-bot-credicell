@@ -25,3 +25,8 @@ Este es un bot de WhatsApp que utiliza el modelo de lenguaje de Twilio para gene
 
    # Configuración de alcance para Google Sheets
    - SCOPES=
+
+9. ## Errores
+   - 2025-05-26 16:17:09,218 - utils.utils_methods - ERROR - Error al inicializar Google Sheets: <Response [200]>
+   2025-05-26 16:17:09,227 - werkzeug - INFO - 127.0.0.1 - - [26/May/2025 16:17:09] "POST /bot HTTP/1.1" 200 -
+   ## Rta:/ Esto es porque el archivo de excel no está como una hoja de cálculo, abre el archivo, y en la parte de archivo dale guardar como hoja de cálculo. y tambien se debe compartir el archivo al email que está en las credenciales json "client_email"
