@@ -72,7 +72,7 @@ def buscar_celular(spreadsheet, worksheet_name: str, busqueda: str) -> Optional[
 
         # Verificar que los headers coincidan
         if not all(header in actual_headers for header in expected_headers):
-            logger.error("Los headers en la hoja no coinciden con los esperados")
+            # logger.error("Los headers en la hoja no coinciden con los esperados")
             return None
 
         # Procesar registros manteniendo los valores calculados
