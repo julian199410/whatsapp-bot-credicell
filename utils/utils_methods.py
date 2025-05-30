@@ -68,7 +68,7 @@ def buscar_celular(spreadsheet, worksheet_name: str, busqueda: str) -> Optional[
         # Obtener todos los valores (incluyendo fórmulas calculadas)
         cell_list = worksheet.get_all_values()
         actual_headers = cell_list[0]
-        logger.info(f"Headers encontrados en {worksheet_name}: {actual_headers}")
+        # logger.info(f"Headers encontrados en {worksheet_name}: {actual_headers}")
 
         # Verificar que los headers coincidan
         if not all(header in actual_headers for header in expected_headers):
