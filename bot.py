@@ -111,25 +111,37 @@ def bot():
                 response = procesar_krediya(data, financiera)
             else:
                 try:
-                    # Para Sumas Pay, Addi, Banco de Bogotá, Brilla
                     precio_base = clean_currency(data.get("PRECIO BASE", 0))
                     precio_addi_sumas = clean_currency(data.get("PRECIO ADDI Y SUMAS", 0))
-                    # sumar la columna de "PRECIO BASE + PRECIO ADDI Y SUMAS" de la hoja de cálculo
                     total = precio_base + precio_addi_sumas
 
                     response = (
                         f"📱 {data.get('CELULAR', 'N/A')}\n\n"
                         f"📊 Información para {financiera.upper()} 📊\n\n"
-                        # f"Precio Base: {format_currency(data.get('PRECIO BASE', 'N/A'))}\n"
-                        # f"Addi/Sumas: {format_currency(data.get('PRECIO ADDI Y SUMAS', 'N/A'))}\n"
-                        # f"➖➖➖➖➖➖➖➖➖\n"
                         f"💰 Total: {format_currency(total)}"
                     )
                 except Exception as e:
                     logger.error(f"Error calculando precio para {financiera}: {e}")
                     response = f"Error calculando el precio para {financiera}"
         else:
-            response = f"No se encontró información para el modelo: {modelo_celular}"
+            # Verificar si está en recompra
+            data_recompra = buscar_celular(spreadsheet, RECOMPRA_WORKSHEET, modelo_celular)
+            if data_recompra:
+                # Verificar si hay coincidencia suficiente
+                celular_recompra = str(data_recompra.get("CELULAR", "")).upper()
+                if all(part in celular_recompra for part in modelo_celular.split()):
+                    response = (
+                        f"El modelo {modelo_celular} solo está disponible para RECOMPRA.\n\n"
+                        f"📱 {celular_recompra}\n\n"
+                        f"📊 Información para RECOMPRA 📊\n\n"
+                        f"Precio de Venta: {format_currency(data_recompra.get('VENTA', 'N/A'))}\n"
+                        f"Precio Total: {format_currency(data_recompra.get('PRECIO ADDI Y SUMAS', 'N/A'))}\n"
+                        f"💡 Sin inicial requerida"
+                    )
+                else:
+                    response = f"No se encontró información exacta para el modelo: {modelo_celular}"
+            else:
+                response = f"No se encontró información para el modelo: {modelo_celular}"
 
     msg.body(response)
 
@@ -140,5 +152,5 @@ def bot():
 
 
 if __name__ == "__main__":
-    # app.run(debug=True, port=5000) # para desarrollo
-    app.run(host='0.0.0.0', debug=False, port=5000) # para producción
+    app.run(debug=True, port=5000) # para desarrollo
+    # app.run(host='0.0.0.0', debug=False, port=5000) # para producción
