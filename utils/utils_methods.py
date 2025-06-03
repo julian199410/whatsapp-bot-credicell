@@ -88,31 +88,37 @@ def buscar_celular(spreadsheet, worksheet_name: str, busqueda: str) -> Optional[
 
         # Búsqueda flexible
         busqueda = busqueda.upper().strip()
+        busqueda_clean = re.sub(r"[^A-Z0-9\s]", "", busqueda)
         busqueda_parts = re.sub(r"[^a-zA-Z0-9\s]", "", busqueda).split()
+        
+        # Eliminar espacios extras y estandarizar GB
+        busqueda_normalized = ' '.join(busqueda_parts).replace("GB", "GB ").replace("  ", " ")
 
         best_match = None
         best_score = 0
 
         for record in records:
             celular = str(record.get("CELULAR", "")).upper()
-            celular_clean = re.sub(r"[^a-zA-Z0-9\s]", "", celular)
+            celular_clean = re.sub(r"[^A-Z0-9\s]", "", celular)
+            celular_normalized = ' '.join(celular_clean.split()).replace("GB", "GB ").replace("  ", " ")
 
-            # Calcular puntaje de coincidencia
-            score = 0
-            for part in busqueda_parts:
-                if part in celular_clean:
-                    score += 1
-
-            # Si encontramos un match perfecto, devolverlo inmediatamente
-            if score == len(busqueda_parts):
+            # Coincidencia exacta
+            if busqueda_normalized == celular_normalized:
                 return record
 
-            # Mantener el mejor match parcial
-            if score > best_score:
-                best_score = score
-                best_match = record
+            # Coincidencia parcial estricta
+            match_all_parts = all(part in celular_normalized for part in busqueda_parts)
+            if match_all_parts:
+                # Priorizar coincidencias más cercanas
+                score = sum(1 for part in busqueda_parts if part in celular_normalized)
+                if score > best_score:
+                    best_score = score
+                    best_match = record
 
-        return best_match if best_score > 0 else None
+        # Solo devolver el mejor match si al menos coincide con la mayoría de las partes
+        if best_match and best_score >= len(busqueda_parts) * 0.7:  # 70% de coincidencia
+            return best_match
+        return None
 
     except Exception as e:
         logger.error(f"Error al buscar en {worksheet_name}: {str(e)}", exc_info=True)
