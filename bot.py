@@ -72,13 +72,29 @@ def bot():
     # Buscar información del celular
     if financiera == "recompra":
         data = buscar_celular(spreadsheet, RECOMPRA_WORKSHEET, modelo_celular)
+        inicial_financiera = format_currency(data.get("INICIAL FINANCIERA", "N/A"))
+        inicial_real = format_currency(data.get("INICIAL REAL", "N/A"))
+        
+                # Calcular el porcentaje real
+        try:
+            venta_valor = clean_currency(data.get("VENTA", 0))
+            inicial_financiera_valor = clean_currency(data.get("INICIAL FINANCIERA", 0))
+            porcentaje = (
+                round((inicial_financiera_valor / venta_valor) * 100)
+                if venta_valor != 0
+                else 0
+            )
+        except ZeroDivisionError:
+            porcentaje = 0
+        
         if data:
             response = (
                 f"📱 {data.get('CELULAR', 'N/A')}\n\n"
                 f"📊 Información para RECOMPRA 📊\n\n"
                 f"Precio de Venta: {format_currency(data.get('VENTA', 'N/A'))}\n"
-                f"Precio Total: {format_currency(data.get('PRECIO ADDI Y SUMAS', 'N/A'))}\n"
-                f"💡 Sin inicial requerida"
+                f"Inicial Financiera ({porcentaje}%): {inicial_financiera}\n"
+                f"Inicial real: {inicial_real}"
+                # f"💡 Sin inicial requerida"
             )
         else:
             response = (
@@ -152,5 +168,5 @@ def bot():
 
 
 if __name__ == "__main__":
-    # app.run(debug=True, port=5000) # para desarrollo
-    app.run(host='0.0.0.0', debug=False, port=5000) # para producción
+    app.run(debug=True, port=5000) # para desarrollo
+    # app.run(host='0.0.0.0', debug=False, port=5000) # para producción
