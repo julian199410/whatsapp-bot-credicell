@@ -88,19 +88,37 @@ def buscar_celular(spreadsheet, worksheet_name: str, busqueda: str) -> Optional[
 
         # Búsqueda flexible
         busqueda = busqueda.upper().strip()
-        busqueda_clean = re.sub(r"[^A-Z0-9\s]", "", busqueda)
-        busqueda_parts = re.sub(r"[^a-zA-Z0-9\s]", "", busqueda).split()
         
-        # Eliminar espacios extras y estandarizar GB
-        busqueda_normalized = ' '.join(busqueda_parts).replace("GB", "GB ").replace("  ", " ")
+        # Mejor normalización para formatos de memoria
+        busqueda = re.sub(r"(\d+)\s*GB\s*[/]?\s*(\d+)\s*RAM", r"\1GB/\2RAM", busqueda)
+        busqueda = re.sub(r"(\d+)\s*GB", r"\1GB", busqueda)
+        busqueda = re.sub(r"(\d+)\s*RAM", r"\1RAM", busqueda)
+        
+        busqueda_clean = re.sub(r"[^A-Z0-9\s/]", "", busqueda)
+        busqueda_parts = re.sub(r"[^a-zA-Z0-9\s/]", "", busqueda).split()
+        
+        # Eliminar espacios extras y estandarizar GB/RAM
+        busqueda_normalized = ' '.join(busqueda_parts)
+        busqueda_normalized = re.sub(r"(\d+)\s*GB\s*[/]?\s*(\d+)\s*RAM", r"\1GB/\2RAM", busqueda_normalized)
+        busqueda_normalized = re.sub(r"(\d+)\s*GB", r"\1GB", busqueda_normalized)
+        busqueda_normalized = re.sub(r"(\d+)\s*RAM", r"\1RAM", busqueda_normalized)
 
         best_match = None
         best_score = 0
 
         for record in records:
             celular = str(record.get("CELULAR", "")).upper()
-            celular_clean = re.sub(r"[^A-Z0-9\s]", "", celular)
-            celular_normalized = ' '.join(celular_clean.split()).replace("GB", "GB ").replace("  ", " ")
+            
+            # Aplicar las mismas normalizaciones al registro
+            celular = re.sub(r"(\d+)\s*GB\s*[/]?\s*(\d+)\s*RAM", r"\1GB/\2RAM", celular)
+            celular = re.sub(r"(\d+)\s*GB", r"\1GB", celular)
+            celular = re.sub(r"(\d+)\s*RAM", r"\1RAM", celular)
+            
+            celular_clean = re.sub(r"[^A-Z0-9\s/]", "", celular)
+            celular_normalized = ' '.join(celular_clean.split())
+            celular_normalized = re.sub(r"(\d+)\s*GB\s*[/]?\s*(\d+)\s*RAM", r"\1GB/\2RAM", celular_normalized)
+            celular_normalized = re.sub(r"(\d+)\s*GB", r"\1GB", celular_normalized)
+            celular_normalized = re.sub(r"(\d+)\s*RAM", r"\1RAM", celular_normalized)
 
             # Coincidencia exacta
             if busqueda_normalized == celular_normalized:
@@ -185,6 +203,10 @@ def procesar_krediya(data: Dict, financiera: str) -> str:
 # Analizar el mensaje del usuario para extraer financiera y modelo
 def parse_user_message(message: str) -> tuple:
     message = message.lower().strip()
+    # Normalizar formatos de memoria primero
+    message = re.sub(r"(\d+)\s*gb\s*[/]?\s*(\d+)\s*ram", r"\1gb/\2ram", message)
+    message = re.sub(r"(\d+)\s*gb", r"\1gb", message)
+    message = re.sub(r"(\d+)\s*ram", r"\1ram", message)
 
     # Patrón para extraer financiera y modelo
     pattern = re.compile(
