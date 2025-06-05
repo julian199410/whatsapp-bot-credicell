@@ -72,10 +72,29 @@ def bot():
     # Buscar información del celular
     if financiera == "recompra":
         data = buscar_celular(spreadsheet, RECOMPRA_WORKSHEET, modelo_celular)
+        if not data:
+            # Verificar si está en valores
+            data_valores = buscar_celular(spreadsheet, VALORES_WORKSHEET, modelo_celular)
+            if data_valores:
+                celular_valores = str(data_valores.get("CELULAR", "")).upper()
+                # Mostrar información aunque no sea coincidencia exacta
+                response = (
+                    f"El modelo {modelo_celular} no está disponible para RECOMPRA, pero tenemos:\n\n"
+                    f"📱 {celular_valores}\n\n"
+                    f"📊 Información disponible en otras financieras 📊\n\n"
+                    f"Precio de Venta: {format_currency(data_valores.get('VENTA', 'N/A'))}\n"
+                    f"Precio con financiación: {format_currency(data_valores.get('PRECIO ADDI Y SUMAS', 'N/A'))}\n"
+                    f"💡 Consulta por financieras como Krediya, Adelantos, etc."
+                )
+            else:
+                response = f"No se encontró información para el modelo: {modelo_celular}"
+            msg.body(response)
+            return str(resp)
+        
         inicial_financiera = format_currency(data.get("INICIAL FINANCIERA", "N/A"))
         inicial_real = format_currency(data.get("INICIAL REAL", "N/A"))
         
-                # Calcular el porcentaje real
+        # Calcular el porcentaje real
         try:
             venta_valor = clean_currency(data.get("VENTA", 0))
             inicial_financiera_valor = clean_currency(data.get("INICIAL FINANCIERA", 0))
