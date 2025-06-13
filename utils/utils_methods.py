@@ -17,17 +17,13 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-# Inicializar conexión con Google Sheets
 def init_google_sheets():
     try:
         creds = ServiceAccountCredentials.from_json_keyfile_name(
             GOOGLE_SHEETS_CREDENTIALS, SCOPES
         )
         client = gspread.authorize(creds)
-        # logger.info("Autenticación con Google Sheets exitosa")
-        
         spreadsheet = client.open(SPREADSHEET_NAME)
-        # logger.info(f"Hoja de cálculo '{SPREADSHEET_NAME}' encontrada")
         return spreadsheet
     except Exception as e:
         logger.error(f"Error detallado al inicializar Google Sheets: {str(e)}", exc_info=True)
@@ -38,7 +34,7 @@ def buscar_celular(spreadsheet, worksheet_name: str, busqueda: str) -> Optional[
     try:
         worksheet = spreadsheet.worksheet(worksheet_name)
 
-        # Encabezados esperados (se mantiene tu validación original)
+        # Encabezados esperados
         if worksheet_name == VALORES_WORKSHEET:
             expected_headers = [
                 "CELULAR",
@@ -50,7 +46,6 @@ def buscar_celular(spreadsheet, worksheet_name: str, busqueda: str) -> Optional[
                 "PRECIO BASE",
                 "PRECIO ADDI Y SUMAS",
                 "CONTADO",
-                # "GANACIA",
             ]
         else:
             expected_headers = [
@@ -62,20 +57,14 @@ def buscar_celular(spreadsheet, worksheet_name: str, busqueda: str) -> Optional[
                 "DESCUENTO",
                 "PRECIO BASE",
                 "PRECIO ADDI Y SUMAS",
-                # "GANACIA",
             ]
 
-        # Obtener todos los valores (incluyendo fórmulas calculadas)
         cell_list = worksheet.get_all_values()
         actual_headers = cell_list[0]
-        # logger.info(f"Headers encontrados en {worksheet_name}: {actual_headers}")
 
-        # Verificar que los headers coincidan
         if not all(header in actual_headers for header in expected_headers):
-            # logger.error("Los headers en la hoja no coinciden con los esperados")
             return None
 
-        # Procesar registros manteniendo los valores calculados
         records = []
         for row in cell_list[1:]:
             record = {}
@@ -86,56 +75,51 @@ def buscar_celular(spreadsheet, worksheet_name: str, busqueda: str) -> Optional[
                     record[header] = "0"
             records.append(record)
 
-        # Búsqueda flexible
+        # Normalización mejorada de la búsqueda
         busqueda = busqueda.upper().strip()
         
-        # Mejor normalización para formatos de memoria
+        # Normalización especial para modelos con memoria
+        busqueda = re.sub(r"(\d+)\s*GB\s*[/]?\s*(\d+)\s*GB", r"\1GB/\2GB", busqueda)
         busqueda = re.sub(r"(\d+)\s*GB\s*[/]?\s*(\d+)\s*RAM", r"\1GB/\2RAM", busqueda)
         busqueda = re.sub(r"(\d+)\s*GB", r"\1GB", busqueda)
         busqueda = re.sub(r"(\d+)\s*RAM", r"\1RAM", busqueda)
+        busqueda = re.sub(r"\s+", " ", busqueda)  # Normalizar múltiples espacios
         
-        busqueda_clean = re.sub(r"[^A-Z0-9\s/]", "", busqueda)
-        busqueda_parts = re.sub(r"[^a-zA-Z0-9\s/]", "", busqueda).split()
-        
-        # Eliminar espacios extras y estandarizar GB/RAM
-        busqueda_normalized = ' '.join(busqueda_parts)
-        busqueda_normalized = re.sub(r"(\d+)\s*GB\s*[/]?\s*(\d+)\s*RAM", r"\1GB/\2RAM", busqueda_normalized)
-        busqueda_normalized = re.sub(r"(\d+)\s*GB", r"\1GB", busqueda_normalized)
-        busqueda_normalized = re.sub(r"(\d+)\s*RAM", r"\1RAM", busqueda_normalized)
-
-        best_match = None
-        best_score = 0
+        exact_matches = []
+        partial_matches = []
 
         for record in records:
             celular = str(record.get("CELULAR", "")).upper()
             
             # Aplicar las mismas normalizaciones al registro
+            celular = re.sub(r"(\d+)\s*GB\s*[/]?\s*(\d+)\s*GB", r"\1GB/\2GB", celular)
             celular = re.sub(r"(\d+)\s*GB\s*[/]?\s*(\d+)\s*RAM", r"\1GB/\2RAM", celular)
             celular = re.sub(r"(\d+)\s*GB", r"\1GB", celular)
             celular = re.sub(r"(\d+)\s*RAM", r"\1RAM", celular)
+            celular = re.sub(r"\s+", " ", celular).strip()
             
-            celular_clean = re.sub(r"[^A-Z0-9\s/]", "", celular)
-            celular_normalized = ' '.join(celular_clean.split())
-            celular_normalized = re.sub(r"(\d+)\s*GB\s*[/]?\s*(\d+)\s*RAM", r"\1GB/\2RAM", celular_normalized)
-            celular_normalized = re.sub(r"(\d+)\s*GB", r"\1GB", celular_normalized)
-            celular_normalized = re.sub(r"(\d+)\s*RAM", r"\1RAM", celular_normalized)
-
-            # Coincidencia exacta
-            if busqueda_normalized == celular_normalized:
-                return record
-
-            # Coincidencia parcial estricta
-            match_all_parts = all(part in celular_normalized for part in busqueda_parts)
-            if match_all_parts:
-                # Priorizar coincidencias más cercanas
-                score = sum(1 for part in busqueda_parts if part in celular_normalized)
-                if score > best_score:
-                    best_score = score
-                    best_match = record
-
-        # Solo devolver el mejor match si al menos coincide con la mayoría de las partes
-        if best_match and best_score >= len(busqueda_parts) * 0.7:  # 70% de coincidencia
-            return best_match
+            # Coincidencia exacta (incluyendo espacios)
+            if busqueda == celular:
+                exact_matches.append(record)
+                continue
+                
+            # Coincidencia parcial (todas las partes presentes)
+            busqueda_parts = [part for part in re.split(r'\s+|/', busqueda) if part]
+            celular_parts = [part for part in re.split(r'\s+|/', celular) if part]
+            if all(part in celular_parts for part in busqueda_parts):
+                partial_matches.append(record)
+        
+        # Devolver coincidencia exacta si existe
+        if exact_matches:
+            if len(exact_matches) == 1:
+                return exact_matches[0]
+            # Si hay múltiples coincidencias exactas (raro pero posible)
+            return {"multiple_options": exact_matches}
+            
+        # Si no hay exactas pero hay parciales, devolverlas para selección
+        if partial_matches:
+            return {"multiple_options": partial_matches}
+            
         return None
 
     except Exception as e:
@@ -143,10 +127,8 @@ def buscar_celular(spreadsheet, worksheet_name: str, busqueda: str) -> Optional[
         return None
 
 
-# Limpiar y formatear valores monetarios
 def clean_currency(value):
     if isinstance(value, str):
-        # Eliminar símbolos de moneda y puntos de mil
         cleaned = value.replace("$", "").replace(".", "").strip()
         try:
             return float(cleaned)
@@ -157,7 +139,6 @@ def clean_currency(value):
     return 0.0
 
 
-# Formatear número como moneda
 def format_currency(value):
     try:
         value = clean_currency(value)
@@ -167,7 +148,6 @@ def format_currency(value):
         return str(value)
 
 
-# Procesar consulta de Krediya
 def procesar_krediya(data: Dict, financiera: str) -> str:
     try:
         celular = data.get("CELULAR", "N/A")
@@ -200,7 +180,6 @@ def procesar_krediya(data: Dict, financiera: str) -> str:
         return "Hubo un error al procesar la información de Krediya."
 
 
-# Analizar el mensaje del usuario para extraer financiera y modelo
 def parse_user_message(message: str) -> tuple:
     message = message.lower().strip()
     # Normalizar formatos de memoria primero
@@ -240,7 +219,7 @@ def parse_user_message(message: str) -> tuple:
 
         # Limpiar el modelo de celular
         modelo = re.sub(r"[^a-zA-Z0-9\s]", "", modelo).upper()
-        modelo = modelo.replace("GB", "GB ").replace("  ", " ").strip()
+        modelo = re.sub(r"\s+", " ", modelo).strip()  # Normalizar espacios
 
         return financiera, modelo
 
