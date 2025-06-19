@@ -2,7 +2,7 @@ import re
 import gspread
 import logging
 from oauth2client.service_account import ServiceAccountCredentials
-from typing import Optional, Dict
+from typing import Optional, Dict, Union
 from config.settings import (
     GOOGLE_SHEETS_CREDENTIALS,
     SPREADSHEET_NAME,
@@ -30,7 +30,7 @@ def init_google_sheets():
         return None
 
 
-def buscar_celular(spreadsheet, worksheet_name: str, busqueda: str) -> Optional[Dict]:
+def buscar_celular(spreadsheet, worksheet_name: str, busqueda: str) -> Optional[Union[Dict, str]]:
     try:
         worksheet = spreadsheet.worksheet(worksheet_name)
 
@@ -78,13 +78,21 @@ def buscar_celular(spreadsheet, worksheet_name: str, busqueda: str) -> Optional[
         # Normalización mejorada de la búsqueda
         busqueda = busqueda.upper().strip()
         
-        # Normalización especial para modelos con memoria
+        # Normalización especial para modelos Samsung (A35 -> A 35)
+        busqueda = re.sub(r"SAMSUNG\s*A\s*(\d+)", r"SAMSUNG A \1", busqueda)
+        busqueda = re.sub(r"SAMSUNG\s*([A-Z]+)\s*(\d+)", r"SAMSUNG \1 \2", busqueda)
+        
+        # Normalización para modelos OPPO
+        busqueda = re.sub(r"OPPO\s*A\s*(\d+)", r"OPPO A\1", busqueda)
+        busqueda = re.sub(r"OPPO\s*([A-Z]+)\s*(\d+)", r"OPPO \1\2", busqueda)
+        
+        # Normalización de memoria
         busqueda = re.sub(r"(\d+)\s*GB\s*[/]?\s*(\d+)\s*GB", r"\1GB/\2GB", busqueda)
         busqueda = re.sub(r"(\d+)\s*GB\s*[/]?\s*(\d+)\s*RAM", r"\1GB/\2RAM", busqueda)
         busqueda = re.sub(r"(\d+)\s*GB", r"\1GB", busqueda)
         busqueda = re.sub(r"(\d+)\s*RAM", r"\1RAM", busqueda)
-        busqueda = re.sub(r"\s+", " ", busqueda)  # Normalizar múltiples espacios
-        
+        busqueda = re.sub(r"\s+", " ", busqueda).strip()
+
         exact_matches = []
         partial_matches = []
 
@@ -92,33 +100,37 @@ def buscar_celular(spreadsheet, worksheet_name: str, busqueda: str) -> Optional[
             celular = str(record.get("CELULAR", "")).upper()
             
             # Aplicar las mismas normalizaciones al registro
+            celular = re.sub(r"SAMSUNG\s*A\s*(\d+)", r"SAMSUNG A \1", celular)
+            celular = re.sub(r"SAMSUNG\s*([A-Z]+)\s*(\d+)", r"SAMSUNG \1 \2", celular)
+            celular = re.sub(r"OPPO\s*A\s*(\d+)", r"OPPO A\1", celular)
+            celular = re.sub(r"OPPO\s*([A-Z]+)\s*(\d+)", r"OPPO \1\2", celular)
             celular = re.sub(r"(\d+)\s*GB\s*[/]?\s*(\d+)\s*GB", r"\1GB/\2GB", celular)
             celular = re.sub(r"(\d+)\s*GB\s*[/]?\s*(\d+)\s*RAM", r"\1GB/\2RAM", celular)
             celular = re.sub(r"(\d+)\s*GB", r"\1GB", celular)
             celular = re.sub(r"(\d+)\s*RAM", r"\1RAM", celular)
             celular = re.sub(r"\s+", " ", celular).strip()
             
-            # Coincidencia exacta (incluyendo espacios)
+            # Coincidencia exacta (comparación normalizada)
             if busqueda == celular:
                 exact_matches.append(record)
                 continue
                 
-            # Coincidencia parcial (todas las partes presentes)
-            busqueda_parts = [part for part in re.split(r'\s+|/', busqueda) if part]
-            celular_parts = [part for part in re.split(r'\s+|/', celular) if part]
+            # Coincidencia parcial (ignorando números)
+            busqueda_parts = [part for part in re.split(r'\s+|/', busqueda) if part and not part.isdigit()]
+            celular_parts = [part for part in re.split(r'\s+|/', celular) if part and not part.isdigit()]
+            
             if all(part in celular_parts for part in busqueda_parts):
                 partial_matches.append(record)
         
-        # Devolver coincidencia exacta si existe
+        # Priorizar coincidencias exactas
         if exact_matches:
             if len(exact_matches) == 1:
                 return exact_matches[0]
-            # Si hay múltiples coincidencias exactas (raro pero posible)
             return {"multiple_options": exact_matches}
             
-        # Si no hay exactas pero hay parciales, devolverlas para selección
+        # Si no hay exactas pero hay parciales
         if partial_matches:
-            return {"multiple_options": partial_matches}
+            return {"multiple_options": partial_matches[:5]}  # Limitar a 5 opciones
             
         return None
 
@@ -182,16 +194,19 @@ def procesar_krediya(data: Dict, financiera: str) -> str:
 
 def parse_user_message(message: str) -> tuple:
     message = message.lower().strip()
-    # Normalizar formatos de memoria primero
-    message = re.sub(r"(\d+)\s*gb\s*[/]?\s*(\d+)\s*ram", r"\1gb/\2ram", message)
-    message = re.sub(r"(\d+)\s*gb", r"\1gb", message)
-    message = re.sub(r"(\d+)\s*ram", r"\1ram", message)
-
-    # Patrón para extraer financiera y modelo
+    
+    # Primero detectar si es una consulta de contado
+    if "contado" in message:
+        modelo = re.sub(r"(precios?|precio|info|informaci[oó]n|consulta|por|de|para|contado)", "", message)
+        modelo = re.sub(r"[^a-zA-Z0-9\s]", "", modelo).upper()
+        modelo = re.sub(r"\s+", " ", modelo).strip()
+        return "contado", modelo
+    
+    # Patrón mejorado para extraer financiera y modelo
     pattern = re.compile(
         r"(?:precios?|precio|info|informaci[oó]n|consulta)\s*(?:por|de|para)?\s*"
         r"(krediya|kredi|credia|crediya|adelantos|adelanto|sumas\s*pay|sumaspay|sumas|addi|"
-        r"banco\s*de\s*bogota|bancobogota|bogota|brilla|recompra|re\s*compra|contado)\s*"
+        r"banco\s*de\s*bogota|bancobogota|bogota|brilla|recompra|re\s*compra)\s*"
         r"(?:de|del|para|sobre)?\s*(.+)",
         re.IGNORECASE,
     )
@@ -201,7 +216,6 @@ def parse_user_message(message: str) -> tuple:
         financiera = match.group(1).lower()
         modelo = match.group(2).strip()
 
-        # Normalizar nombres de financieras
         financiera_map = {
             "kredi": "krediya",
             "credia": "krediya",
@@ -212,15 +226,18 @@ def parse_user_message(message: str) -> tuple:
             "bancobogota": "banco de bogota",
             "bogota": "banco de bogota",
             "re compra": "recompra",
-            "contado": "contado",
         }
-
+        
         financiera = financiera_map.get(financiera, financiera)
 
-        # Limpiar el modelo de celular
+        modelo = re.sub(r"(precios?|precio|info|informaci[oó]n|consulta|por|de|para)", "", modelo)
         modelo = re.sub(r"[^a-zA-Z0-9\s]", "", modelo).upper()
-        modelo = re.sub(r"\s+", " ", modelo).strip()  # Normalizar espacios
+        modelo = re.sub(r"\s+", " ", modelo).strip()
 
         return financiera, modelo
 
-    return None, None
+    modelo = re.sub(r"(precios?|precio|info|informaci[oó]n|consulta|por|de|para)", "", message)
+    modelo = re.sub(r"[^a-zA-Z0-9\s]", "", modelo).upper()
+    modelo = re.sub(r"\s+", " ", modelo).strip()
+    
+    return None, modelo
